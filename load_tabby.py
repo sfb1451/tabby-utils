@@ -108,9 +108,40 @@ def process_publications(publications):
 
 
 def process_funding(funding):
-    """Ensure that funding is an array"""
-    return [funding] if isinstance(funding, dict) else funding
+    """Edit funding item(s), return an array
 
+    Ensure that funding is an array. Edit DFG funding to spell out
+    Deutsche Forschungsgemeinschaft and build a gepris url from the
+    identifier. For SFB1451, populate additional fields based on the
+    identifier (assuming 431549029-<project> format).
+
+    Each funding element will have a @type: https://schema.org/Grant,
+    so that we can apply custom rules in catalog template.
+
+    """
+
+    if isinstance(funding, dict):
+        funding = [funding]
+
+    grant_list = []
+    for f in funding:
+        grant = f.copy()
+        if grant.get("funder") == "DFG":
+            grant["funder"] = "Deutsche Forschungsgemeinschaft (DFG)"
+            if grant.get("identifier").startswith("431549029-"):
+                project, _, subproject = grant.get("identifier").rpartition("-")
+                grant["name"] = "SFB 1451: Key mechanisms of motor control in health and disease"
+                grant["alternateName"] = f"SFB 1451 ({project}, {subproject} project)"
+                grant["identifier"] = f"https://gepris.dfg.de/gepris/projekt/{project}"
+            else:
+                grant["identifier"] = f"https://gepris.dfg.de/gepris/projekt/{grant.get(identifier)}"
+
+        # replace compact IRI with a full IRI
+        grant["@type"] = grant.get("@type", "").replace("schema:", "https://schema.org/")
+
+        grant_list.append(grant)
+
+    return grant_list
 
 def process_keywords(keywords):
     """Ensure that keywords are an array"""
@@ -249,7 +280,7 @@ cat_context = {
     "funding": {
         "@id": "schema:funding",
         "@context": {
-            "name": "schema:funder",
+            "funder": "schema:funder",
             "identifier": "schema:identifier",
         },
     },
